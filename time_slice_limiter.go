@@ -13,8 +13,8 @@ import (
 // if the user performs 49 operations at a rate of 100op/hour, as long as they do not make two more
 // operations within the same hour.
 type TimeSliceLimiter struct {
-	TimeSlice  time.Duration
-	MaxCounter int64
+	timeSlice  time.Duration
+	maxCounter int64
 
 	accessLock    sync.RWMutex
 	sweepRunning  bool
@@ -23,21 +23,29 @@ type TimeSliceLimiter struct {
 	sliceMap      map[string]*timeSlice
 }
 
+// NewTimeSliceLimiter generates a TimeSliceLimiter with the given parameters.
+func NewTimeSliceLimiter(sliceTime time.Duration, maxCounter int64) *TimeSliceLimiter {
+	return &TimeSliceLimiter{timeSlice: sliceTime, maxCounter: maxCounter,
+		sliceMap: map[string]*timeSlice{}}
+}
+
 // Get returns the number of operations a given ID is allowed to perform in the current time slice.
-// If the ID has never been limited, this will be t.MaxCount.
+// If the ID has never been limited, this will be the maximum counter value. This may be negative.
 func (t *TimeSliceLimiter) Get(id string) int64 {
 	t.accessLock.RLock()
 	defer t.accessLock.RUnlock()
 	if slice, ok := t.sliceMap[id]; ok {
 		return slice.Get()
 	} else {
-		return t.MaxCounter
+		return t.maxCounter
 	}
 }
 
-// Limit decrements a "counter" for a given ID. The counter starts at t.MaxCounter and resets after
-// t.TimeSlice. This returns false if the counter has reached a value below zero (i.e. if the user
-// has used all their operations for this time slice).
+// Limit decrements a "counter" for a given ID. The counter starts at the maximum counter value and
+// resets after the time slice goes by.
+//
+// This returns false if the counter has reached a value below zero (i.e. if the user has used all
+// their operations for this time slice).
 func (t *TimeSliceLimiter) Limit(id string) bool {
 	t.accessLock.RLock()
 	if slice, ok := t.sliceMap[id]; ok && !slice.Expired() {
@@ -46,7 +54,7 @@ func (t *TimeSliceLimiter) Limit(id string) bool {
 	}
 	t.accessLock.RUnlock()
 
-	expiration := time.Now().Add(t.TimeSlice)
+	expiration := time.Now().Add(t.timeSlice)
 
 	t.accessLock.Lock()
 	defer t.accessLock.Unlock()
@@ -56,7 +64,7 @@ func (t *TimeSliceLimiter) Limit(id string) bool {
 		return slice.Decrement() >= 0
 	}
 
-	slice := &timeSlice{expiration, id, t.MaxCounter - 1, nil}
+	slice := &timeSlice{expiration, id, t.maxCounter - 1, nil}
 	t.addSlice(slice)
 
 	if !t.sweepRunning {
@@ -64,7 +72,7 @@ func (t *TimeSliceLimiter) Limit(id string) bool {
 		go t.sweepLoop()
 	}
 
-	return t.MaxCounter-1 >= 0
+	return t.maxCounter-1 >= 0
 }
 
 func (t *TimeSliceLimiter) addSlice(slice *timeSlice) {
@@ -75,6 +83,7 @@ func (t *TimeSliceLimiter) addSlice(slice *timeSlice) {
 		t.earliestSlice = slice
 		t.latestSlice = slice
 	}
+	t.sliceMap[slice.Identifier] = slice
 }
 
 func (t *TimeSliceLimiter) removeEarliestSlice() {
@@ -93,6 +102,7 @@ func (t *TimeSliceLimiter) sweepLoop() {
 			t.removeEarliestSlice()
 		}
 		var iterationDelay time.Duration
+
 		if t.earliestSlice == nil {
 			t.sweepRunning = false
 			t.accessLock.Unlock()
