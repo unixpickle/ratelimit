@@ -27,8 +27,12 @@ func (h HTTPRemoteNamer) Name(r *http.Request) string {
 }
 
 func (h HTTPRemoteNamer) encodeIPv6Binary(address []byte) string {
-	res := make([]byte, h.IPv6Bits)
-	for bitIndex := 0; bitIndex < h.IPv6Bits; bitIndex++ {
+	bitCount := h.IPv6Bits
+	if bitCount == 0 {
+		bitCount = DefaultIPv6Bits
+	}
+	res := make([]byte, bitCount)
+	for bitIndex := 0; bitIndex < bitCount; bitIndex++ {
 		byteIndex := bitIndex / 8
 		bitShift := uint(7 - (bitIndex % 8))
 		if address[byteIndex]&(1<<bitShift) == 0 {
