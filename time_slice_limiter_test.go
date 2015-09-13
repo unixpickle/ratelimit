@@ -26,6 +26,12 @@ func TestTimeSliceLimiterLongTerm(t *testing.T) {
 	if limiter.Limit("B") {
 		t.Error("expected ID to reach limit (B)")
 	}
+
+	for i := 19; i > -10; i-- {
+		if limiter.Decrement("C") != int64(i) {
+			t.Error("unexpected decrement value", i)
+		}
+	}
 }
 
 func TestTimeSliceLimiterResetting(t *testing.T) {

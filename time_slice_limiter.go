@@ -29,6 +29,37 @@ func NewTimeSliceLimiter(sliceTime time.Duration, maxCounter int64) *TimeSliceLi
 		sliceMap: map[string]*timeSlice{}}
 }
 
+// Decrement decrements the "counter" for a given ID. The counter starts at the maximum counter
+// value and resets after the time slice goes by. The new counter value is returned.
+func (t *TimeSliceLimiter) Decrement(id string) int64 {
+	t.accessLock.RLock()
+	if slice, ok := t.sliceMap[id]; ok && !slice.Expired() {
+		defer t.accessLock.RUnlock()
+		return slice.Decrement()
+	}
+	t.accessLock.RUnlock()
+
+	expiration := time.Now().Add(t.timeSlice)
+
+	t.accessLock.Lock()
+	defer t.accessLock.Unlock()
+
+	// NOTE: while we had the mutex unlocked, some other goroutine may have created a slice.
+	if slice, ok := t.sliceMap[id]; ok && !slice.Expired() {
+		return slice.Decrement()
+	}
+
+	slice := &timeSlice{expiration, id, t.maxCounter - 1, nil}
+	t.addSlice(slice)
+
+	if !t.sweepRunning {
+		t.sweepRunning = true
+		go t.sweepLoop()
+	}
+
+	return t.maxCounter - 1
+}
+
 // Get returns the number of operations a given ID is allowed to perform in the current time slice.
 // If the ID has never been limited, this will be the maximum counter value. This may be negative.
 func (t *TimeSliceLimiter) Get(id string) int64 {
@@ -41,38 +72,10 @@ func (t *TimeSliceLimiter) Get(id string) int64 {
 	}
 }
 
-// Limit decrements a "counter" for a given ID. The counter starts at the maximum counter value and
-// resets after the time slice goes by.
-//
-// This returns false if the counter has reached a value below zero (i.e. if the user has used all
-// their operations for this time slice).
+// Limit decrements the counter for a given ID and returns true if the new counter is not less than
+// zero. This is equivalent to doing t.Decrement(id) >= 0.
 func (t *TimeSliceLimiter) Limit(id string) bool {
-	t.accessLock.RLock()
-	if slice, ok := t.sliceMap[id]; ok && !slice.Expired() {
-		defer t.accessLock.RUnlock()
-		return slice.Decrement() >= 0
-	}
-	t.accessLock.RUnlock()
-
-	expiration := time.Now().Add(t.timeSlice)
-
-	t.accessLock.Lock()
-	defer t.accessLock.Unlock()
-
-	// NOTE: while we had the mutex unlocked, some other goroutine may have created a slice.
-	if slice, ok := t.sliceMap[id]; ok && !slice.Expired() {
-		return slice.Decrement() >= 0
-	}
-
-	slice := &timeSlice{expiration, id, t.maxCounter - 1, nil}
-	t.addSlice(slice)
-
-	if !t.sweepRunning {
-		t.sweepRunning = true
-		go t.sweepLoop()
-	}
-
-	return t.maxCounter-1 >= 0
+	return t.Decrement(id) >= 0
 }
 
 func (t *TimeSliceLimiter) addSlice(slice *timeSlice) {
