@@ -6,12 +6,16 @@ import (
 	"time"
 )
 
-// TimeSliceLimiter limits the number of operations per unit of time. It does not control the rate
-// at which those operations are performed within the unit of time.
+// TimeSliceLimiter limits the number of operations per
+// unit of time.
+// It does not control the rate at which those operations
+// are performed within the unit of time.
 //
-// For example, a TimeSliceLimiter which limits the user to 50 operations per hour will not complain
-// if the user performs 49 operations at a rate of 100op/hour, as long as they do not make two more
-// operations within the same hour.
+// For example, a TimeSliceLimiter which limits the user
+// to 50 operations per hour will not complain if the user
+// performs 49 operations at a rate of 100op/hour, as long
+// as they do not make two more operations within the same
+// hour.
 type TimeSliceLimiter struct {
 	timeSlice  time.Duration
 	maxCounter int64
@@ -23,14 +27,17 @@ type TimeSliceLimiter struct {
 	sliceMap      map[string]*timeSlice
 }
 
-// NewTimeSliceLimiter generates a TimeSliceLimiter with the given parameters.
+// NewTimeSliceLimiter generates a TimeSliceLimiter with
+// the given parameters.
 func NewTimeSliceLimiter(sliceTime time.Duration, maxCounter int64) *TimeSliceLimiter {
 	return &TimeSliceLimiter{timeSlice: sliceTime, maxCounter: maxCounter,
 		sliceMap: map[string]*timeSlice{}}
 }
 
-// Decrement decrements the "counter" for a given ID. The counter starts at the maximum counter
-// value and resets after the time slice goes by. The new counter value is returned.
+// Decrement decrements the "counter" for a given ID.
+// The counter starts at the maximum counter value and
+// resets after the time slice goes by.
+// The new counter value is returned.
 func (t *TimeSliceLimiter) Decrement(id string) int64 {
 	t.accessLock.RLock()
 	if slice, ok := t.sliceMap[id]; ok && !slice.Expired() {
@@ -44,7 +51,8 @@ func (t *TimeSliceLimiter) Decrement(id string) int64 {
 	t.accessLock.Lock()
 	defer t.accessLock.Unlock()
 
-	// NOTE: while we had the mutex unlocked, some other goroutine may have created a slice.
+	// NOTE: while we had the mutex unlocked, some other
+	// goroutine may have created a slice.
 	if slice, ok := t.sliceMap[id]; ok && !slice.Expired() {
 		return slice.Decrement()
 	}
@@ -60,8 +68,11 @@ func (t *TimeSliceLimiter) Decrement(id string) int64 {
 	return t.maxCounter - 1
 }
 
-// Get returns the number of operations a given ID is allowed to perform in the current time slice.
-// If the ID has never been limited, this will be the maximum counter value. This may be negative.
+// Get returns the number of operations a given ID is
+// allowed to perform in the current time slice.
+// If the ID has never been limited, this will be the
+// maximum counter value.
+// This may be negative.
 func (t *TimeSliceLimiter) Get(id string) int64 {
 	t.accessLock.RLock()
 	defer t.accessLock.RUnlock()
@@ -72,8 +83,9 @@ func (t *TimeSliceLimiter) Get(id string) int64 {
 	}
 }
 
-// Limit decrements the counter for a given ID and returns true if the new counter is not less than
-// zero. This is equivalent to doing t.Decrement(id) >= 0.
+// Limit decrements the counter for a given ID and returns
+// true if the new counter is not less than zero.
+// This is equivalent to doing t.Decrement(id) >= 0.
 func (t *TimeSliceLimiter) Limit(id string) bool {
 	return t.Decrement(id) >= 0
 }

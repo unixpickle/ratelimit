@@ -8,14 +8,17 @@ import (
 
 const DefaultIPv6Bits = 64
 
-// HTTPRemoteNamer assigns unique IDs to the remote hosts of http requests.
+// HTTPRemoteNamer assigns unique IDs to the remote hosts
+// of http requests.
 type HTTPRemoteNamer struct {
-	// IPv6Bits indicates how many bits of IPv6 addresses should be counted towards the remote
-	// address. If this is 0, the default value DefaultIPv6Bits will be used.
+	// IPv6Bits indicates how many bits of IPv6 addresses
+	// should be counted towards the remote address.
+	// If this is 0, DefaultIPv6Bits is be used.
 	IPv6Bits int
 }
 
-// Name generates a unique ID for the source of the HTTP request.
+// Name generates a unique ID for the source of the HTTP
+// request.
 func (h HTTPRemoteNamer) Name(r *http.Request) string {
 	ipStr := rawIPFromRequest(r)
 	parsed := net.ParseIP(ipStr)
