@@ -19,7 +19,7 @@ func nameForRemoteIP(n HTTPRemoteNamer, ip string) string {
 }
 
 func TestHTTPRemoteNamer(t *testing.T) {
-	namer := HTTPRemoteNamer{34}
+	namer := HTTPRemoteNamer{IPv6Bits: 34, NumProxies: 1}
 	if nameForRemoteAddr(namer, "[2001:0db8:ac10:fe01::]:1234") !=
 		"0010000000000001000011011011100010" {
 		t.Error("unexpected result")

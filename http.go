@@ -26,7 +26,7 @@ type HTTPRemoteNamer struct {
 // Name generates a unique ID for the source of the HTTP
 // request.
 func (h HTTPRemoteNamer) Name(r *http.Request) string {
-	ipStr := rawIPFromRequest(r)
+	ipStr := h.rawIPFromRequest(r)
 	parsed := net.ParseIP(ipStr)
 	if parsed == nil || parsed.To4() != nil {
 		return ipStr
