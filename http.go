@@ -15,6 +15,12 @@ type HTTPRemoteNamer struct {
 	// should be counted towards the remote address.
 	// If this is 0, DefaultIPv6Bits is be used.
 	IPv6Bits int
+
+	// NumProxies specifies the number of reverse proxies the
+	// server is behind.
+	// If this is non-zero, the "X-Forwarded-For" header may
+	// be used to extract the original remote IP.
+	NumProxies int
 }
 
 // Name generates a unique ID for the source of the HTTP
@@ -47,6 +53,18 @@ func (h HTTPRemoteNamer) encodeIPv6Binary(address []byte) string {
 	return string(res)
 }
 
+func (h HTTPRemoteNamer) rawIPFromRequest(r *http.Request) string {
+	if h.NumProxies > 0 {
+		if forwardHeader := r.Header.Get("X-Forwarded-For"); forwardHeader != "" {
+			hosts := strings.Split(forwardHeader, ",")
+			if len(hosts) >= h.NumProxies {
+				return strings.TrimSpace(hosts[len(hosts)-h.NumProxies])
+			}
+		}
+	}
+	return rawIPFromRemoteAddr(r.RemoteAddr)
+}
+
 func rawIPFromRemoteAddr(addr string) string {
 	if !strings.HasPrefix(addr, "[") {
 		// The address is "IPv4Address:port"
@@ -59,11 +77,4 @@ func rawIPFromRemoteAddr(addr string) string {
 		panic("invalid remote address: " + addr)
 	}
 	return ipv6Addr[1:]
-}
-
-func rawIPFromRequest(r *http.Request) string {
-	if forwardHeader := r.Header.Get("X-Forwarded-For"); forwardHeader != "" {
-		return strings.Split(forwardHeader, ", ")[0]
-	}
-	return rawIPFromRemoteAddr(r.RemoteAddr)
 }
