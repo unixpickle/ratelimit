@@ -84,10 +84,10 @@ func (t *TimeSliceLimiter) Get(id string) int64 {
 }
 
 // Limit decrements the counter for a given ID and returns
-// true if the new counter is not less than zero.
+// true if the new counter is less than zero.
 // This is equivalent to doing t.Decrement(id) >= 0.
 func (t *TimeSliceLimiter) Limit(id string) bool {
-	return t.Decrement(id) >= 0
+	return t.Decrement(id) < 0
 }
 
 func (t *TimeSliceLimiter) addSlice(slice *timeSlice) {
